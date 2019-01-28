@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	pbempty "github.com/golang/protobuf/ptypes/empty"
@@ -153,6 +154,8 @@ func (k *kubeProvider) Configure(_ context.Context, req *pulumirpc.ConfigureRequ
 		return nil, err
 	}
 	k.clientSet = cs
+
+	time.Sleep(10 * time.Second)
 
 	return &pbempty.Empty{}, nil
 }
