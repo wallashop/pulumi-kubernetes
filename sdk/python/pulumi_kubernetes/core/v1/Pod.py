@@ -1,5 +1,6 @@
 import pulumi
 import pulumi.runtime
+from typing import Optional
 
 from ... import tables
 
@@ -29,6 +30,24 @@ class Pod(pulumi.CustomResource):
             __name__,
             __props__,
             __opts__)
+
+    def get(self, __name__: str,
+            identifier: pulumi.Input[str],
+            __opts__: Optional[pulumi.ResourceOptions] = None
+            ):
+        """
+        Get the state of an existing `Pod` resource, as identified by `identifier`.
+        Typically this identifier  is of the form <namespace>/<name>; if <namespace> is omitted, then (per
+        Kubernetes convention) the identifier becomes default/<name>.
+       
+        Pulumi will keep track of this resource using `name` as the Pulumi ID.
+    
+        :param __name__: _Unique_ name used to register this resource with Pulumi.
+        :param identifier: An ID for the Kubernetes resource to retrieve. Takes the form
+        <namespace>/<name> or <name>.
+        :param __opts__: Uniquely specifies a CustomResource to select.
+        """
+        return Pod(__name__, __opts__, )
 
     def translate_output_property(self, prop: str) -> str:
         return tables._CASING_FORWARD_TABLE.get(prop) or prop
