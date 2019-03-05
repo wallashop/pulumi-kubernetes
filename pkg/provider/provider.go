@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	pbempty "github.com/golang/protobuf/ptypes/empty"
-	"github.com/golang/protobuf/ptypes/struct"
+	structpb "github.com/golang/protobuf/ptypes/struct"
 	"github.com/pulumi/pulumi-kubernetes/pkg/await"
 	"github.com/pulumi/pulumi-kubernetes/pkg/clients"
 	"github.com/pulumi/pulumi-kubernetes/pkg/metadata"
@@ -33,9 +33,10 @@ import (
 	"github.com/pulumi/pulumi/pkg/resource/provider"
 	"github.com/pulumi/pulumi/pkg/util/contract"
 	"github.com/pulumi/pulumi/pkg/util/rpcutil/rpcerror"
-	"github.com/pulumi/pulumi/sdk/proto/go"
+	pulumirpc "github.com/pulumi/pulumi/sdk/proto/go"
 	"github.com/yudai/gojsondiff"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -55,10 +56,6 @@ import (
 
 // --------------------------------------------------------------------------
 
-const (
-	gvkDelimiter = ":"
-)
-
 type cancellationContext struct {
 	context context.Context
 	cancel  context.CancelFunc
@@ -77,12 +74,12 @@ type kubeOpts struct {
 }
 
 type kubeProvider struct {
-	host           *provider.HostClient
-	canceler       *cancellationContext
-	name           string
-	version        string
-	providerPrefix string
-	opts           kubeOpts
+	host            *provider.HostClient
+	canceler        *cancellationContext
+	name            string
+	version         string
+	providerPackage string
+	opts            kubeOpts
 
 	clientSet *clients.DynamicClientSet
 }
@@ -93,12 +90,22 @@ func makeKubeProvider(
 	host *provider.HostClient, name, version string,
 ) (pulumirpc.ResourceProviderServer, error) {
 	return &kubeProvider{
-		host:           host,
-		canceler:       makeCancellationContext(),
-		name:           name,
-		version:        version,
-		providerPrefix: name + gvkDelimiter,
+		host:            host,
+		canceler:        makeCancellationContext(),
+		name:            name,
+		version:         version,
+		providerPackage: name,
 	}, nil
+}
+
+// CheckConfig validates the configuration for this Terraform provider.
+func (p *kubeProvider) CheckConfig(ctx context.Context, req *pulumirpc.CheckRequest) (*pulumirpc.CheckResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "CheckConfig is not yet implemented")
+}
+
+// DiffConfig diffs the configuration for this Terraform provider.
+func (p *kubeProvider) DiffConfig(ctx context.Context, req *pulumirpc.DiffRequest) (*pulumirpc.DiffResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "DiffConfig is not yet implemented")
 }
 
 // Configure configures the resource provider with "globals" that control its behavior.
@@ -247,7 +254,7 @@ func (k *kubeProvider) Check(ctx context.Context, req *pulumirpc.CheckRequest) (
 		// NOTE: If old inputs exist, they have a name, either provided by the user or filled in with a
 		// previous run of `Check`.
 		contract.Assert(oldInputs.GetName() != "")
-		metadata.AdoptOldNameIfUnnamed(newInputs, oldInputs)
+		metadata.AdoptOldAutonameIfUnnamed(newInputs, oldInputs)
 	} else {
 		metadata.AssignNameIfAutonamable(newInputs, urn.Name())
 	}
@@ -365,8 +372,24 @@ func (k *kubeProvider) Diff(
 	// Pack up PB, ship response back.
 	hasChanges := pulumirpc.DiffResponse_DIFF_NONE
 	diff := gojsondiff.New().CompareObjects(oldInputs.Object, newInputs.Object)
+	var changes []string
 	if len(diff.Deltas()) > 0 {
 		hasChanges = pulumirpc.DiffResponse_DIFF_SOME
+		for _, d := range diff.Deltas() {
+			var position gojsondiff.Position
+			switch d := d.(type) {
+			case gojsondiff.PostDelta:
+				position = d.PostPosition()
+			case gojsondiff.PreDelta:
+				position = d.PrePosition()
+			default:
+				contract.Failf("unexpected diff position type %T", d)
+			}
+
+			if k, ok := position.(gojsondiff.Name); ok {
+				changes = append(changes, string(k))
+			}
+		}
 	}
 
 	// Delete before replacement if we are forced to replace the old object, and the new version of
@@ -388,6 +411,7 @@ func (k *kubeProvider) Diff(
 		Replaces:            replaces,
 		Stables:             []string{},
 		DeleteBeforeReplace: deleteBeforeReplace,
+		Diffs:               changes,
 	}, nil
 }
 
@@ -455,7 +479,7 @@ func (k *kubeProvider) Create(
 	if awaitErr != nil {
 		// Resource was created but failed to initialize. Return live version of object so it can be
 		// checkpointed.
-		return nil, partialError(FqObjName(initialized), awaitErr, inputsAndComputed)
+		return nil, partialError(FqObjName(initialized), awaitErr, inputsAndComputed, nil)
 	}
 
 	// Invalidate the client cache if this was a CRD. This will require subsequent CR creations to
@@ -504,15 +528,26 @@ func (k *kubeProvider) Read(ctx context.Context, req *pulumirpc.ReadRequest) (*p
 	oldInputs, newInputs := parseCheckpointObject(oldState)
 
 	if oldInputs.GroupVersionKind().Empty() {
-		oldInputs.SetGroupVersionKind(newInputs.GroupVersionKind())
+		if newInputs.GroupVersionKind().Empty() {
+			gvk, err := k.gvkFromURN(urn)
+			if err != nil {
+				return nil, err
+			}
+			oldInputs.SetGroupVersionKind(gvk)
+		} else {
+			oldInputs.SetGroupVersionKind(newInputs.GroupVersionKind())
+		}
 	}
 
-	_, name := ParseFqName(req.GetId())
+	namespace, name := ParseFqName(req.GetId())
 	if name == "" {
 		return nil, fmt.Errorf("failed to parse resource name from request ID: %s", req.GetId())
 	}
 	if oldInputs.GetName() == "" {
 		oldInputs.SetName(name)
+	}
+	if oldInputs.GetNamespace() == "" {
+		oldInputs.SetNamespace(namespace)
 	}
 
 	config := await.ReadConfig{
@@ -550,6 +585,9 @@ func (k *kubeProvider) Read(ctx context.Context, req *pulumirpc.ReadRequest) (*p
 		// initialize.
 	}
 
+	// Estimate the inputs for this object.
+	liveInputs := estimateLiveInputs(liveObj)
+
 	// TODO(lblackstone): not sure why this is needed
 	id := FqObjName(liveObj)
 	if reqID := req.GetId(); len(reqID) > 0 {
@@ -557,9 +595,17 @@ func (k *kubeProvider) Read(ctx context.Context, req *pulumirpc.ReadRequest) (*p
 	}
 
 	// Return a new "checkpoint object".
-	inputsAndComputed, err := plugin.MarshalProperties(
-		checkpointObject(oldInputs, liveObj), plugin.MarshalOptions{
-			Label: fmt.Sprintf("%s.inputsAndComputed", label), KeepUnknowns: true, SkipNulls: true,
+	state, err := plugin.MarshalProperties(
+		checkpointObject(liveInputs, liveObj), plugin.MarshalOptions{
+			Label: fmt.Sprintf("%s.state", label), KeepUnknowns: true, SkipNulls: true,
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, err := plugin.MarshalProperties(
+		resource.NewPropertyMapFromMap(liveInputs.Object), plugin.MarshalOptions{
+			Label: label + ".inputs", KeepUnknowns: true, SkipNulls: true,
 		})
 	if err != nil {
 		return nil, err
@@ -568,11 +614,11 @@ func (k *kubeProvider) Read(ctx context.Context, req *pulumirpc.ReadRequest) (*p
 	if readErr != nil {
 		// Resource was created but failed to initialize. Return live version of object so it can be
 		// checkpointed.
-		glog.V(3).Infof("%v", partialError(id, readErr, inputsAndComputed))
-		return nil, partialError(id, readErr, inputsAndComputed)
+		glog.V(3).Infof("%v", partialError(id, readErr, state, inputs))
+		return nil, partialError(id, readErr, state, inputs)
 	}
 
-	return &pulumirpc.ReadResponse{Id: id, Properties: inputsAndComputed}, nil
+	return &pulumirpc.ReadResponse{Id: id, Properties: state, Inputs: inputs}, nil
 }
 
 // Update updates an existing resource with new values. Currently this client supports the
@@ -698,7 +744,7 @@ func (k *kubeProvider) Update(
 	if awaitErr != nil {
 		// Resource was updated/created but failed to initialize. Return live version of object so it
 		// can be checkpointed.
-		return nil, partialError(FqObjName(initialized), awaitErr, inputsAndComputed)
+		return nil, partialError(FqObjName(initialized), awaitErr, inputsAndComputed, nil)
 	}
 
 	return &pulumirpc.UpdateResponse{Properties: inputsAndComputed}, nil
@@ -756,7 +802,7 @@ func (k *kubeProvider) Delete(
 
 		// Resource delete was issued, but failed to complete. Return live version of object so it can be
 		// checkpointed.
-		return nil, partialError(FqObjName(lastKnownState), awaitErr, inputsAndComputed)
+		return nil, partialError(FqObjName(lastKnownState), awaitErr, inputsAndComputed, nil)
 	}
 
 	return &pbempty.Empty{}, nil
@@ -791,25 +837,24 @@ func (k *kubeProvider) label() string {
 
 func (k *kubeProvider) gvkFromURN(urn resource.URN) (schema.GroupVersionKind, error) {
 	// Strip prefix.
-	s := string(urn.Type())
-	contract.Assertf(strings.HasPrefix(s, k.providerPrefix), "Kubernetes GVK is: %q", string(urn))
-	s = s[len(k.providerPrefix):]
+	contract.Assertf(string(urn.Type().Package()) == k.providerPackage, "Kubernetes GVK is: %q", string(urn))
 
 	// Emit GVK.
-	gvk := strings.Split(s, gvkDelimiter)
-	gv := strings.Split(gvk[0], "/")
-	if len(gvk) < 2 {
+	kind := string(urn.Type().Name())
+	gv := strings.Split(string(urn.Type().Module().Name()), "/")
+	if len(gv) != 2 {
 		return schema.GroupVersionKind{},
-			fmt.Errorf("GVK must have both an apiVersion and a Kind: %q", s)
-	} else if len(gv) != 2 {
-		return schema.GroupVersionKind{},
-			fmt.Errorf("apiVersion does not have both a group and a version: %q", s)
+			fmt.Errorf("apiVersion does not have both a group and a version: %q", urn.Type().Module().Name())
+	}
+	group, version := gv[0], gv[1]
+	if group == "core" {
+		group = ""
 	}
 
 	return schema.GroupVersionKind{
-		Group:   gv[0],
-		Version: gv[1],
-		Kind:    gvk[1],
+		Group:   group,
+		Version: version,
+		Kind:    kind,
 	}, nil
 }
 
@@ -857,15 +902,16 @@ func parseCheckpointObject(obj resource.PropertyMap) (oldInputs, live *unstructu
 
 // partialError creates an error for resources that did not complete an operation in progress.
 // The last known state of the object is included in the error so that it can be checkpointed.
-func partialError(id string, err error, inputsAndComputed *structpb.Struct) error {
+func partialError(id string, err error, state *structpb.Struct, inputs *structpb.Struct) error {
 	reasons := []string{err.Error()}
 	if aggregate, isAggregate := err.(await.AggregatedError); isAggregate {
 		reasons = append(reasons, aggregate.SubErrors()...)
 	}
 	detail := pulumirpc.ErrorResourceInitFailed{
 		Id:         id,
-		Properties: inputsAndComputed,
+		Properties: state,
 		Reasons:    reasons,
+		Inputs:     inputs,
 	}
 	return rpcerror.WithDetails(rpcerror.New(codes.Unknown, err.Error()), &detail)
 }
@@ -877,4 +923,26 @@ func canonicalNamespace(ns string) string {
 		return "default"
 	}
 	return ns
+}
+
+// estimateLiveInputs computes an estimate of the provider inputs that produced the given live object. This is used by
+// Read.
+func estimateLiveInputs(live *unstructured.Unstructured) *unstructured.Unstructured {
+	// Start with a copy of the live object's state.
+	inputs := live.DeepCopy()
+
+	// Remove all known system-populated metadata.
+	inputs.SetUID("")
+	inputs.SetResourceVersion("")
+	inputs.SetGeneration(0)
+	inputs.SetSelfLink("")
+	inputs.SetContinue("")
+	inputs.SetCreationTimestamp(metav1.Time{})
+	inputs.SetDeletionTimestamp(nil)
+	inputs.SetDeletionGracePeriodSeconds(nil)
+
+	// Remove the status field.
+	delete(inputs.Object, "status")
+
+	return inputs
 }
