@@ -148,6 +148,12 @@ export namespace admissionregistration {
        */
       path?: pulumi.Input<string>
 
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      port?: pulumi.Input<number>
+
     }
 
 
@@ -345,8 +351,6 @@ export namespace admissionregistration {
        * specified.
        * 
        * If the webhook is running within the cluster, then you should use `service`.
-       * 
-       * Port 443 will be used if it is open, otherwise it is an error.
        */
       service?: pulumi.Input<admissionregistration.v1beta1.ServiceReference>
 
@@ -510,7 +514,8 @@ export namespace apiextensions {
       status: pulumi.Input<string>
 
       /**
-       * Type is the type of the condition.
+       * Type is the type of the condition. Types include Established, NamesAccepted and
+       * Terminating.
        */
       type: pulumi.Input<string>
 
@@ -967,6 +972,12 @@ export namespace apiextensions {
        */
       path?: pulumi.Input<string>
 
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      port?: pulumi.Input<number>
+
     }
 
 
@@ -986,8 +997,6 @@ export namespace apiextensions {
        * specified.
        * 
        * If the webhook is running within the cluster, then you should use `service`.
-       * 
-       * Port 443 will be used if it is open, otherwise it is an error.
        */
       service?: pulumi.Input<apiextensions.v1beta1.ServiceReference>
 
@@ -1217,6 +1226,12 @@ export namespace apiregistration {
        */
       namespace?: pulumi.Input<string>
 
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      port?: pulumi.Input<number>
+
     }
 
 
@@ -1415,6 +1430,12 @@ export namespace apiregistration {
        * Namespace is the namespace of the service
        */
       namespace?: pulumi.Input<string>
+
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      port?: pulumi.Input<number>
 
     }
 
@@ -4588,6 +4609,12 @@ export namespace auditregistration {
        */
       path?: pulumi.Input<string>
 
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      port?: pulumi.Input<number>
+
     }
 
 
@@ -4623,8 +4650,6 @@ export namespace auditregistration {
        * specified.
        * 
        * If the webhook is running within the cluster, then you should use `service`.
-       * 
-       * Port 443 will be used if it is open, otherwise it is an error.
        */
       service?: pulumi.Input<auditregistration.v1alpha1.ServiceReference>
 
@@ -9799,7 +9824,7 @@ export namespace core {
       lastObservedTime?: pulumi.Input<string>
 
       /**
-       * State of this Series: Ongoing or Finished
+       * State of this Series: Ongoing or Finished Deprecated. Planned removal for 1.18
        */
       state?: pulumi.Input<string>
 
@@ -12146,6 +12171,11 @@ export namespace core {
        */
       sysctls?: pulumi.Input<pulumi.Input<core.v1.Sysctl>[]>
 
+      /**
+       * Windows security options.
+       */
+      windowsOptions?: pulumi.Input<core.v1.WindowsSecurityContextOptions>
+
     }
 
 
@@ -12301,8 +12331,8 @@ export namespace core {
        * used to run this pod.  If no RuntimeClass resource matches the named class, the pod will
        * not be run. If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit
        * class with an empty definition that uses the default runtime handler. More info:
-       * https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md This is an alpha feature and
-       * may change in the future.
+       * https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md This is a beta feature as of
+       * Kubernetes v1.14.
        */
       runtimeClassName?: pulumi.Input<string>
 
@@ -13686,6 +13716,11 @@ export namespace core {
        */
       seLinuxOptions?: pulumi.Input<core.v1.SELinuxOptions>
 
+      /**
+       * Windows security options.
+       */
+      windowsOptions?: pulumi.Input<core.v1.WindowsSecurityContextOptions>
+
     }
 
 
@@ -14553,7 +14588,7 @@ export namespace core {
        * Expanded path within the volume from which the container's volume should be mounted.
        * Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded
        * using the container's environment. Defaults to "" (volume's root). SubPathExpr and SubPath
-       * are mutually exclusive. This field is alpha in 1.14.
+       * are mutually exclusive. This field is beta in 1.15.
        */
       subPathExpr?: pulumi.Input<string>
 
@@ -14809,7 +14844,8 @@ export namespace events {
       lastObservedTime: pulumi.Input<string>
 
       /**
-       * Information whether this series is ongoing or finished.
+       * Information whether this series is ongoing or finished. Deprecated. Planned removal for
+       * 1.18
        */
       state: pulumi.Input<string>
 
@@ -16170,6 +16206,13 @@ export namespace extensions {
       runAsGroup?: pulumi.Input<extensions.v1beta1.RunAsGroupStrategyOptions>
 
       /**
+       * runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod. If
+       * this field is omitted, the pod's runtimeClassName field is unrestricted. Enforcement of
+       * this field depends on the RuntimeClass feature gate being enabled.
+       */
+      runtimeClass?: pulumi.Input<extensions.v1beta1.RuntimeClassStrategyOptions>
+
+      /**
        * volumes is a white list of allowed volume plugins. Empty indicates that no volumes may be
        * used. To allow all volumes you may use '*'.
        */
@@ -16469,6 +16512,27 @@ export namespace extensions {
        * uid then supply a single range with the same start and end. Required for MustRunAs.
        */
       ranges?: pulumi.Input<pulumi.Input<extensions.v1beta1.IDRange>[]>
+
+    }
+
+
+    /**
+     * RuntimeClassStrategyOptions define the strategy that will dictate the allowable
+     * RuntimeClasses for a pod.
+     */
+    export interface RuntimeClassStrategyOptions {
+      /**
+       * allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a
+       * pod. A value of "*" means that any RuntimeClass name is allowed, and must be the only item
+       * in the list. An empty list requires the RuntimeClassName field to be unset.
+       */
+      allowedRuntimeClassNames: pulumi.Input<pulumi.Input<string>[]>
+
+      /**
+       * defaultRuntimeClassName is the default RuntimeClassName to set on the pod. The default MUST
+       * be allowed by the allowedRuntimeClassNames list. A value of nil does not mutate the Pod.
+       */
+      defaultRuntimeClassName?: pulumi.Input<string>
 
     }
 
@@ -17014,6 +17078,16 @@ export namespace meta {
        * have received this token from an error message.
        */
       continue?: pulumi.Input<string>
+
+      /**
+       * RemainingItemCount is the number of subsequent items in the list which are not included in
+       * this list response. If the list request contained label or field selectors, then the number
+       * of remaining items is unknown and this field will be unset. If the list is complete (either
+       * because it is unpaginated or because this is the last page), then there are no more
+       * remaining items and this field will also be unset.  Servers older than v1.15 do not set
+       * this field.
+       */
+      remainingItemCount?: pulumi.Input<number>
 
       /**
        * String that identifies the server's internal version of this object that can be used by
@@ -18772,6 +18846,13 @@ export namespace policy {
       runAsGroup?: pulumi.Input<policy.v1beta1.RunAsGroupStrategyOptions>
 
       /**
+       * runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod. If
+       * this field is omitted, the pod's runtimeClassName field is unrestricted. Enforcement of
+       * this field depends on the RuntimeClass feature gate being enabled.
+       */
+      runtimeClass?: pulumi.Input<policy.v1beta1.RuntimeClassStrategyOptions>
+
+      /**
        * volumes is a white list of allowed volume plugins. Empty indicates that no volumes may be
        * used. To allow all volumes you may use '*'.
        */
@@ -18814,6 +18895,27 @@ export namespace policy {
        * uid then supply a single range with the same start and end. Required for MustRunAs.
        */
       ranges?: pulumi.Input<pulumi.Input<policy.v1beta1.IDRange>[]>
+
+    }
+
+
+    /**
+     * RuntimeClassStrategyOptions define the strategy that will dictate the allowable
+     * RuntimeClasses for a pod.
+     */
+    export interface RuntimeClassStrategyOptions {
+      /**
+       * allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a
+       * pod. A value of "*" means that any RuntimeClass name is allowed, and must be the only item
+       * in the list. An empty list requires the RuntimeClassName field to be unset.
+       */
+      allowedRuntimeClassNames: pulumi.Input<pulumi.Input<string>[]>
+
+      /**
+       * defaultRuntimeClassName is the default RuntimeClassName to set on the pod. The default MUST
+       * be allowed by the allowedRuntimeClassNames list. A value of nil does not mutate the Pod.
+       */
+      defaultRuntimeClassName?: pulumi.Input<string>
 
     }
 

@@ -137,6 +137,12 @@ export namespace admissionregistration {
        */
       readonly path: string
 
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      readonly port: number
+
     }
 
     /**
@@ -324,8 +330,6 @@ export namespace admissionregistration {
        * specified.
        * 
        * If the webhook is running within the cluster, then you should use `service`.
-       * 
-       * Port 443 will be used if it is open, otherwise it is an error.
        */
       readonly service: admissionregistration.v1beta1.ServiceReference
 
@@ -497,7 +501,8 @@ export namespace apiextensions {
       readonly status: string
 
       /**
-       * Type is the type of the condition.
+       * Type is the type of the condition. Types include Established, NamesAccepted and
+       * Terminating.
        */
       readonly type: string
 
@@ -925,6 +930,12 @@ export namespace apiextensions {
        */
       readonly path: string
 
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      readonly port: number
+
     }
 
     /**
@@ -943,8 +954,6 @@ export namespace apiextensions {
        * specified.
        * 
        * If the webhook is running within the cluster, then you should use `service`.
-       * 
-       * Port 443 will be used if it is open, otherwise it is an error.
        */
       readonly service: apiextensions.v1beta1.ServiceReference
 
@@ -1162,6 +1171,12 @@ export namespace apiregistration {
        */
       readonly namespace: string
 
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      readonly port: number
+
     }
 
   }
@@ -1348,6 +1363,12 @@ export namespace apiregistration {
        * Namespace is the namespace of the service
        */
       readonly namespace: string
+
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      readonly port: number
 
     }
 
@@ -4343,6 +4364,12 @@ export namespace auditregistration {
        */
       readonly path: string
 
+      /**
+       * If specified, the port on the service that hosting webhook. Default to 443 for backward
+       * compatibility. `port` should be a valid port number (1-65535, inclusive).
+       */
+      readonly port: number
+
     }
 
     /**
@@ -4376,8 +4403,6 @@ export namespace auditregistration {
        * specified.
        * 
        * If the webhook is running within the cluster, then you should use `service`.
-       * 
-       * Port 443 will be used if it is open, otherwise it is an error.
        */
       readonly service: auditregistration.v1alpha1.ServiceReference
 
@@ -9276,7 +9301,7 @@ export namespace core {
       readonly lastObservedTime: string
 
       /**
-       * State of this Series: Ongoing or Finished
+       * State of this Series: Ongoing or Finished Deprecated. Planned removal for 1.18
        */
       readonly state: string
 
@@ -11512,6 +11537,11 @@ export namespace core {
        */
       readonly sysctls: core.v1.Sysctl[]
 
+      /**
+       * Windows security options.
+       */
+      readonly windowsOptions: core.v1.WindowsSecurityContextOptions
+
     }
 
     /**
@@ -11666,8 +11696,8 @@ export namespace core {
        * used to run this pod.  If no RuntimeClass resource matches the named class, the pod will
        * not be run. If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit
        * class with an empty definition that uses the default runtime handler. More info:
-       * https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md This is an alpha feature and
-       * may change in the future.
+       * https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md This is a beta feature as of
+       * Kubernetes v1.14.
        */
       readonly runtimeClassName: string
 
@@ -12992,6 +13022,11 @@ export namespace core {
        */
       readonly seLinuxOptions: core.v1.SELinuxOptions
 
+      /**
+       * Windows security options.
+       */
+      readonly windowsOptions: core.v1.WindowsSecurityContextOptions
+
     }
 
     /**
@@ -13826,7 +13861,7 @@ export namespace core {
        * Expanded path within the volume from which the container's volume should be mounted.
        * Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded
        * using the container's environment. Defaults to "" (volume's root). SubPathExpr and SubPath
-       * are mutually exclusive. This field is alpha in 1.14.
+       * are mutually exclusive. This field is beta in 1.15.
        */
       readonly subPathExpr: string
 
@@ -14069,7 +14104,8 @@ export namespace events {
       readonly lastObservedTime: string
 
       /**
-       * Information whether this series is ongoing or finished.
+       * Information whether this series is ongoing or finished. Deprecated. Planned removal for
+       * 1.18
        */
       readonly state: string
 
@@ -15347,6 +15383,13 @@ export namespace extensions {
       readonly runAsUser: extensions.v1beta1.RunAsUserStrategyOptions
 
       /**
+       * runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod. If
+       * this field is omitted, the pod's runtimeClassName field is unrestricted. Enforcement of
+       * this field depends on the RuntimeClass feature gate being enabled.
+       */
+      readonly runtimeClass: extensions.v1beta1.RuntimeClassStrategyOptions
+
+      /**
        * seLinux is the strategy that will dictate the allowable labels that may be set.
        */
       readonly seLinux: extensions.v1beta1.SELinuxStrategyOptions
@@ -15641,6 +15684,26 @@ export namespace extensions {
        * rule is the strategy that will dictate the allowable RunAsUser values that may be set.
        */
       readonly rule: string
+
+    }
+
+    /**
+     * RuntimeClassStrategyOptions define the strategy that will dictate the allowable
+     * RuntimeClasses for a pod.
+     */
+    export interface RuntimeClassStrategyOptions {
+      /**
+       * allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a
+       * pod. A value of "*" means that any RuntimeClass name is allowed, and must be the only item
+       * in the list. An empty list requires the RuntimeClassName field to be unset.
+       */
+      readonly allowedRuntimeClassNames: string[]
+
+      /**
+       * defaultRuntimeClassName is the default RuntimeClassName to set on the pod. The default MUST
+       * be allowed by the allowedRuntimeClassNames list. A value of nil does not mutate the Pod.
+       */
+      readonly defaultRuntimeClassName: string
 
     }
 
@@ -16151,6 +16214,16 @@ export namespace meta {
        * have received this token from an error message.
        */
       readonly continue: string
+
+      /**
+       * RemainingItemCount is the number of subsequent items in the list which are not included in
+       * this list response. If the list request contained label or field selectors, then the number
+       * of remaining items is unknown and this field will be unset. If the list is complete (either
+       * because it is unpaginated or because this is the last page), then there are no more
+       * remaining items and this field will also be unset.  Servers older than v1.15 do not set
+       * this field.
+       */
+      readonly remainingItemCount: number
 
       /**
        * String that identifies the server's internal version of this object that can be used by
@@ -17803,6 +17876,13 @@ export namespace policy {
       readonly runAsUser: policy.v1beta1.RunAsUserStrategyOptions
 
       /**
+       * runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod. If
+       * this field is omitted, the pod's runtimeClassName field is unrestricted. Enforcement of
+       * this field depends on the RuntimeClass feature gate being enabled.
+       */
+      readonly runtimeClass: policy.v1beta1.RuntimeClassStrategyOptions
+
+      /**
        * seLinux is the strategy that will dictate the allowable labels that may be set.
        */
       readonly seLinux: policy.v1beta1.SELinuxStrategyOptions
@@ -17854,6 +17934,26 @@ export namespace policy {
        * rule is the strategy that will dictate the allowable RunAsUser values that may be set.
        */
       readonly rule: string
+
+    }
+
+    /**
+     * RuntimeClassStrategyOptions define the strategy that will dictate the allowable
+     * RuntimeClasses for a pod.
+     */
+    export interface RuntimeClassStrategyOptions {
+      /**
+       * allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a
+       * pod. A value of "*" means that any RuntimeClass name is allowed, and must be the only item
+       * in the list. An empty list requires the RuntimeClassName field to be unset.
+       */
+      readonly allowedRuntimeClassNames: string[]
+
+      /**
+       * defaultRuntimeClassName is the default RuntimeClassName to set on the pod. The default MUST
+       * be allowed by the allowedRuntimeClassNames list. A value of nil does not mutate the Pod.
+       */
+      readonly defaultRuntimeClassName: string
 
     }
 
