@@ -909,6 +909,39 @@ export namespace apiextensions {
       
       readonly uniqueItems: boolean
 
+      /**
+       * x-kubernetes-embedded-resource defines that the value is an embedded Kubernetes
+       * runtime.Object, with TypeMeta and ObjectMeta. The type must be object. It is allowed to
+       * further restrict the embedded object. kind, apiVersion and metadata are validated
+       * automatically. x-kubernetes-preserve-unknown-fields is allowed to be true, but does not
+       * have to be if the object is fully specified (up to kind, apiVersion, metadata).
+       */
+      readonly x_kubernetes_embedded_resource: boolean
+
+      /**
+       * x-kubernetes-int-or-string specifies that this value is either an integer or a string. If
+       * this is true, an empty type is allowed and type as child of anyOf is permitted if following
+       * one of the following patterns:
+       * 
+       * 1) anyOf:
+       *    - type: integer
+       *    - type: string
+       * 2) allOf:
+       *    - anyOf:
+       *      - type: integer
+       *      - type: string
+       *    - ... zero or more
+       */
+      readonly x_kubernetes_int_or_string: boolean
+
+      /**
+       * x-kubernetes-preserve-unknown-fields stops the API server decoding step from pruning fields
+       * which are not specified in the validation schema. This affects fields recursively, but
+       * switches back to normal pruning behaviour if nested properties or additionalProperties are
+       * specified in the schema. This can either be true or undefined. False is forbidden.
+       */
+      readonly x_kubernetes_preserve_unknown_fields: boolean
+
     }
 
     /**
@@ -7871,6 +7904,15 @@ export namespace core {
      */
     export interface CSIPersistentVolumeSource {
       /**
+       * ControllerExpandSecretRef is a reference to the secret object containing sensitive
+       * information to pass to the CSI driver to complete the CSI ControllerExpandVolume call. This
+       * is an alpha field and requires enabling ExpandCSIVolumes feature gate. This field is
+       * optional, and may be empty if no secret is required. If the secret object contains more
+       * than one secret, all secrets are passed.
+       */
+      readonly controllerExpandSecretRef: core.v1.SecretReference
+
+      /**
        * ControllerPublishSecretRef is a reference to the secret object containing sensitive
        * information to pass to the CSI driver to complete the CSI ControllerPublishVolume and
        * ControllerUnpublishVolume calls. This field is optional, and may be empty if no secret is
@@ -8313,7 +8355,7 @@ export namespace core {
       readonly name: string
 
       /**
-       * Specify whether the ConfigMap or it's key must be defined
+       * Specify whether the ConfigMap or its key must be defined
        */
       readonly optional: boolean
 
@@ -8413,7 +8455,7 @@ export namespace core {
       readonly name: string
 
       /**
-       * Specify whether the ConfigMap or it's keys must be defined
+       * Specify whether the ConfigMap or its keys must be defined
        */
       readonly optional: boolean
 
@@ -8453,7 +8495,7 @@ export namespace core {
       readonly name: string
 
       /**
-       * Specify whether the ConfigMap or it's keys must be defined
+       * Specify whether the ConfigMap or its keys must be defined
        */
       readonly optional: boolean
 
@@ -12825,7 +12867,7 @@ export namespace core {
       readonly name: string
 
       /**
-       * Specify whether the Secret or it's key must be defined
+       * Specify whether the Secret or its key must be defined
        */
       readonly optional: boolean
 
@@ -12940,7 +12982,7 @@ export namespace core {
       readonly items: core.v1.KeyToPath[]
 
       /**
-       * Specify whether the Secret or it's keys must be defined
+       * Specify whether the Secret or its keys must be defined
        */
       readonly optional: boolean
 
