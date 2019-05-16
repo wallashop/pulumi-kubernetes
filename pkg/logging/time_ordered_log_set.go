@@ -22,12 +22,63 @@ import (
 
 // Message stores a log string and the severity for the log message.
 type Message struct {
-	s        string
-	severity diag.Severity
+	S        string
+	Severity diag.Severity
 }
 
 func (m Message) String() string {
-	return fmt.Sprintf("[%s] %s", m.severity, m.s)
+	return fmt.Sprintf("[%s] %s", m.Severity, m.S)
+}
+
+func (m Message) Empty() bool {
+	return len(m.S) == 0 && len(m.Severity) == 0
+}
+
+func StatusMessage(msg string) Message {
+	return Message{S: msg, Severity: diag.Info}
+}
+
+func WarningMessage(msg string) Message {
+	return Message{S: msg, Severity: diag.Warning}
+}
+
+func ErrorMessage(msg string) Message {
+	return Message{S: msg, Severity: diag.Error}
+}
+
+type Messages []Message
+
+func (m Messages) Infos() Messages {
+	var messages Messages
+	for _, message := range m {
+		if message.Severity == diag.Info {
+			messages = append(messages, message)
+		}
+	}
+
+	return messages
+}
+
+func (m Messages) Warnings() Messages {
+	var messages Messages
+	for _, message := range m {
+		if message.Severity == diag.Warning {
+			messages = append(messages, message)
+		}
+	}
+
+	return messages
+}
+
+func (m Messages) Errors() Messages {
+	var messages Messages
+	for _, message := range m {
+		if message.Severity == diag.Error {
+			messages = append(messages, message)
+		}
+	}
+
+	return messages
 }
 
 // TimeOrderedLogSet stores a temporally-ordered set of log messages.

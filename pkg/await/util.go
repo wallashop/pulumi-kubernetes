@@ -33,6 +33,16 @@ import (
 
 const trueStatus = "True"
 
+// fqName returns the fully qualified name of the object in the form `[namespace]/name`.
+// The namespace is omitted if it is "default" or "".
+func fqName(obj metav1.Object) string {
+	ns := obj.GetNamespace()
+	if ns != "" && ns != "default" {
+		return obj.GetNamespace() + "/" + obj.GetName()
+	}
+	return obj.GetName()
+}
+
 // --------------------------------------------------------------------------
 
 // Event helpers.
